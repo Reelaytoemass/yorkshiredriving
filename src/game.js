@@ -328,6 +328,7 @@ function addTownScenery(node, index) {
   const tangent = connections.get(node.id)
     .map(edge => edge.curve.getTangentAt(edge.a === node.id ? 0 : 1).multiplyScalar(edge.a === node.id ? 1 : -1))
     .sort((a, b) => Math.abs(a.x) - Math.abs(b.x))[0];
+  if (!tangent) return;
   if (node.id === 'stokesley') {
     const signNode = { ...node, x: node.x + 0.065, z: node.z - 0.06 };
     addRoadsideSign(signNode, tangent, true);
@@ -420,10 +421,14 @@ function startDrive() {
 document.querySelector('#start-drive').addEventListener('click', startDrive);
 window.addEventListener('keydown', event => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
-  held.add(event.code.toLowerCase());
+  const key = event.code.startsWith('Key') ? event.code.slice(3).toLowerCase() : event.code.toLowerCase();
+  held.add(key);
   if (!state.started && ['enter', 'arrowup', 'w'].includes(event.key.toLowerCase())) startDrive();
 });
-window.addEventListener('keyup', event => held.delete(event.code.toLowerCase()));
+window.addEventListener('keyup', event => {
+  const key = event.code.startsWith('Key') ? event.code.slice(3).toLowerCase() : event.code.toLowerCase();
+  held.delete(key);
+});
 window.addEventListener('blur', () => { held.clear(); touchHeld.clear(); });
 
 for (const button of document.querySelectorAll('[data-control]')) {
