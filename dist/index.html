@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#aebdb6" />
-    <meta name="description" content="A first-person drive from Stokesley into the North York Moors." />
-    <title>North Yorkshire Drive</title>
-    <script type="module" crossorigin src="/assets/index-Chp2j1zF.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-B12P2rLM.css">
+    <meta name="description" content="Take the wheel outside Stokesley School and explore North Yorkshire's towns, moors and coast." />
+    <title>North Yorkshire Drive — Open Roads</title>
+    <script type="module" crossorigin src="/yorkshiredriving/assets/index-uPYcesbQ.js"></script>
+    <link rel="stylesheet" crossorigin href="/yorkshiredriving/assets/index-CW4pJBRg.css">
   </head>
   <body>
     <main id="game" aria-label="North Yorkshire driving game">
@@ -20,14 +20,14 @@
           <span class="eyebrow">NORTH YORKSHIRE</span>
           <span class="location-name">Stokesley</span>
         </div>
-        <div class="road-label"><span class="road-shield">B1257</span><span>COUNTRY ROAD</span></div>
+        <div class="road-label"><span class="road-shield" id="road-number">B1257</span><span id="road-type">MOOR ROAD</span></div>
       </header>
 
-      <section class="route-card" aria-label="Journey progress">
-        <span class="route-label">YOUR DRIVE</span>
-        <span class="route-name">STOKESLEY <i></i> NORTH YORK MOORS</span>
-        <div class="route-track"><span id="route-progress"></span><span class="route-dot"></span></div>
-        <div class="route-distance"><span>START</span><span id="distance">0.0 KM</span><span>THE MOORS</span></div>
+      <section class="route-card" aria-label="North Yorkshire road map and journey">
+        <span class="route-label">EXPLORE NORTH YORKSHIRE</span>
+        <canvas id="map-canvas" width="560" height="300" aria-label="Map showing roads and towns across North Yorkshire"></canvas>
+        <span class="route-name" id="junction-info">NEXT · GREAT AYTON / A-D AT JUNCTIONS</span>
+        <div class="route-distance"><span>TRIP</span><span id="distance">0.0 KM</span><span>OPEN ROADS</span></div>
       </section>
 
       <section class="speed-panel" aria-label="Driving speed">
@@ -41,15 +41,15 @@
       <section class="start-screen" id="start-screen" aria-label="Start your drive">
         <div class="start-kicker"><span></span> YOUR JOURNEY BEGINS HERE</div>
         <h1>Out of<br /><em>Stokesley.</em></h1>
-        <p>North Yorkshire, your own pace.</p>
+        <p>From the school gates to the Moors—and beyond.</p>
         <button id="start-drive" type="button"><span>Start the drive</span><b aria-hidden="true">↗</b></button>
-        <span class="start-point">STARTING OUTSIDE STOKESLEY SCHOOL</span>
+        <span class="start-point">STARTING OUTSIDE STOKESLEY SCHOOL · NORTH YORKSHIRE</span>
       </section>
 
       <footer class="control-bar" aria-label="Driving controls">
         <span><kbd>W</kbd> <kbd>↑</kbd> ACCELERATE</span>
         <span><kbd>S</kbd> <kbd>↓</kbd> BRAKE</span>
-        <span><kbd>A</kbd> <kbd>D</kbd> STEER</span>
+        <span><kbd>A</kbd> <kbd>D</kbd> STEER · CHOOSE TURNS</span>
         <span class="control-divider"></span>
         <span><kbd>SPACE</kbd> HANDBRAKE</span>
       </footer>
