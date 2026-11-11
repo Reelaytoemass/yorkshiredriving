@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#aebdb6" />
+    <meta name="description" content="A first-person drive from Stokesley into the North York Moors." />
+    <title>North Yorkshire Drive</title>
+  </head>
+  <body>
+    <main id="game" aria-label="North Yorkshire driving game">
+      <div id="scene" aria-hidden="true"></div>
+      <div class="windshield" aria-hidden="true"></div>
+
+      <header class="location-bar">
+        <div class="location-mark" aria-hidden="true"><span></span></div>
+        <div class="location-copy">
+          <span class="eyebrow">NORTH YORKSHIRE</span>
+          <span class="location-name">Stokesley</span>
+        </div>
+        <div class="road-label"><span class="road-shield">B1257</span><span>COUNTRY ROAD</span></div>
+      </header>
+
+      <section class="route-card" aria-label="Journey progress">
+        <span class="route-label">YOUR DRIVE</span>
+        <span class="route-name">STOKESLEY <i></i> NORTH YORK MOORS</span>
+        <div class="route-track"><span id="route-progress"></span><span class="route-dot"></span></div>
+        <div class="route-distance"><span>START</span><span id="distance">0.0 KM</span><span>THE MOORS</span></div>
+      </section>
+
+      <section class="speed-panel" aria-label="Driving speed">
+        <div class="speed-readout"><span id="speed">0</span><span class="speed-unit">KM/H</span></div>
+        <div class="speed-rule"><span id="rev-bar"></span></div>
+        <div class="gear-row"><span id="gear">P</span><span id="drive-state">PARKED</span><span class="gear-indicator">●</span></div>
+      </section>
+
+      <div class="road-alert" id="road-alert" aria-live="polite">SLOW DOWN — NARROW ROAD</div>
+
+      <section class="start-screen" id="start-screen" aria-label="Start your drive">
+        <div class="start-kicker"><span></span> YOUR JOURNEY BEGINS HERE</div>
+        <h1>Out of<br /><em>Stokesley.</em></h1>
+        <p>North Yorkshire, your own pace.</p>
+        <button id="start-drive" type="button"><span>Start the drive</span><b aria-hidden="true">↗</b></button>
+        <span class="start-point">STARTING OUTSIDE STOKESLEY SCHOOL</span>
+      </section>
+
+      <footer class="control-bar" aria-label="Driving controls">
+        <span><kbd>W</kbd> <kbd>↑</kbd> ACCELERATE</span>
+        <span><kbd>S</kbd> <kbd>↓</kbd> BRAKE</span>
+        <span><kbd>A</kbd> <kbd>D</kbd> STEER</span>
+        <span class="control-divider"></span>
+        <span><kbd>SPACE</kbd> HANDBRAKE</span>
+      </footer>
+
+      <div class="touch-controls" aria-label="Touch driving controls">
+        <div class="touch-steer">
+          <button type="button" data-control="left" aria-label="Steer left">←</button>
+          <button type="button" data-control="right" aria-label="Steer right">→</button>
+        </div>
+        <div class="touch-pedals">
+          <button type="button" data-control="brake" aria-label="Brake">BRAKE</button>
+          <button type="button" data-control="accelerate" aria-label="Accelerate">GO</button>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
