@@ -2,8 +2,8 @@
 
 A first-person driving game that starts outside Stokesley School. Follow the
 connected roads through the North York Moors, the Yorkshire Dales, market towns,
-and the coast. Choose left or right at junctions to explore; the small map tracks
-your position as you drive.
+and the coast. Steer freely to follow roads or explore off-road; the small map
+tracks your position as you drive.
 
 The starting streets, school grounds, and nearby building outlines are based on
 OpenStreetMap data. The wider regional scenery remains stylized.
@@ -12,8 +12,8 @@ OpenStreetMap data. The wider regional scenery remains stylized.
 
 - **W / Up arrow:** accelerate
 - **S / Down arrow / Space:** brake
-- **A / Left arrow:** steer left; choose left turns at junctions
-- **D / Right arrow:** steer right; choose right turns at junctions
+- **A / Left arrow:** steer left
+- **D / Right arrow:** steer right
 
 Touch controls are available on smaller screens.
 

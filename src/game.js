@@ -135,12 +135,12 @@ function worldPoint(node) {
 function addStokesleyMap() {
   const campusShape = new THREE.Shape();
   stokesleyMap.school.forEach(([x, z], index) => {
-    if (index === 0) campusShape.moveTo(x, -z);
-    else campusShape.lineTo(x, -z);
+    if (index === 0) campusShape.moveTo(x, z);
+    else campusShape.lineTo(x, z);
   });
   campusShape.closePath();
   const campusGeometry = new THREE.ShapeGeometry(campusShape);
-  campusGeometry.rotateX(-Math.PI / 2);
+  campusGeometry.rotateX(Math.PI / 2);
   campusGeometry.translate(0, -0.16, 0);
   scene.add(new THREE.Mesh(
     campusGeometry,
@@ -412,6 +412,28 @@ for (const edge of edges) {
   connections.get(edge.b).push(edge);
 }
 
+const roadSegments = stokesleyMap.roads.flatMap(road => road.points.slice(1).map((end, index) => {
+  const [startX, startZ] = road.points[index];
+  const [endX, endZ] = end;
+  return {
+    start: new THREE.Vector3(startX, 0, startZ),
+    end: new THREE.Vector3(endX, 0, endZ),
+    name: road.name,
+    type: road.type.toUpperCase(),
+  };
+}));
+for (const edge of edges) {
+  const points = edge.curve.getPoints(48);
+  for (let index = 1; index < points.length; index += 1) {
+    roadSegments.push({
+      start: points[index - 1],
+      end: points[index],
+      name: edge.name,
+      type: edge.type,
+    });
+  }
+}
+
 addStokesleyMap();
 
 function addRoseberryTopping() {
@@ -526,11 +548,9 @@ const state = {
   started: false,
   speed: 0,
   trip: 0,
-  offset: 0,
   steer: 0,
-  edge: edges.find(edge => edge.a === 'stokesley' && edge.b === 'great-ayton'),
-  direction: 1,
-  traversal: 0,
+  position: new THREE.Vector3(-42.3, 0, 68.9),
+  heading: Math.atan2(-17, 27) + Math.PI,
   alertTimeout: 0,
   lastHudUpdate: 0,
 };
@@ -589,60 +609,26 @@ function pressed(...keys) {
 }
 
 function currentPoint() {
-  const progress = THREE.MathUtils.clamp(state.traversal / state.edge.length, 0, 1);
-  const t = state.direction === 1 ? progress : 1 - progress;
-  const point = state.edge.curve.getPointAt(t);
-  const tangent = state.edge.curve.getTangentAt(t).multiplyScalar(state.direction).normalize();
-  return { point, tangent, t };
+  const tangent = new THREE.Vector3(-Math.sin(state.heading), 0, -Math.cos(state.heading));
+  return { point: state.position, tangent };
 }
 
-function turnAngle(incoming, outgoing) {
-  const dot = THREE.MathUtils.clamp(incoming.x * outgoing.x + incoming.z * outgoing.z, -1, 1);
-  const cross = incoming.z * outgoing.x - incoming.x * outgoing.z;
-  return Math.atan2(cross, dot);
-}
-
-function outgoingOptions(nodeId, incomingEdge) {
-  return connections.get(nodeId).filter(edge => edge !== incomingEdge).map(edge => {
-    const direction = edge.a === nodeId ? 1 : -1;
-    const tangent = edge.curve.getTangentAt(direction === 1 ? 0 : 1).multiplyScalar(direction).normalize();
-    const destination = nodeById.get(direction === 1 ? edge.b : edge.a);
-    return { edge, direction, tangent, destination };
-  });
-}
-
-function nextJunction() {
-  const endNodeId = state.direction === 1 ? state.edge.b : state.edge.a;
-  const point = currentPoint();
-  const distanceToEnd = state.edge.length - state.traversal;
-  return { nodeId: endNodeId, point, distance: Math.max(0, distanceToEnd), options: outgoingOptions(endNodeId, state.edge) };
-}
-
-function chooseNextRoad(nodeId, incoming, steering) {
-  const options = outgoingOptions(nodeId, state.edge);
-  if (!options.length) {
-    state.edge = edges.find(edge => edge === state.edge);
-    state.direction *= -1;
-    state.traversal = 0;
-    return;
+function nearestRoad(position) {
+  let closest = { distance: Infinity, name: '', type: '' };
+  for (const segment of roadSegments) {
+    const dx = segment.end.x - segment.start.x;
+    const dz = segment.end.z - segment.start.z;
+    const lengthSquared = dx * dx + dz * dz;
+    const projection = lengthSquared === 0
+      ? 0
+      : THREE.MathUtils.clamp(((position.x - segment.start.x) * dx + (position.z - segment.start.z) * dz) / lengthSquared, 0, 1);
+    const distance = Math.hypot(
+      position.x - segment.start.x - projection * dx,
+      position.z - segment.start.z - projection * dz,
+    );
+    if (distance < closest.distance) closest = { distance, name: segment.name, type: segment.type };
   }
-  const choices = options.map(option => ({ ...option, angle: turnAngle(incoming, option.tangent) }));
-  let selected;
-  if (steering > 0.35) {
-    selected = choices.filter(choice => choice.angle > 0.22).sort((a, b) => a.angle - b.angle)[0];
-  } else if (steering < -0.35) {
-    selected = choices.filter(choice => choice.angle < -0.22).sort((a, b) => b.angle - a.angle)[0];
-  }
-  selected ??= choices.sort((a, b) => Math.abs(a.angle) - Math.abs(b.angle))[0];
-  state.edge = selected.edge;
-  state.direction = selected.direction;
-  state.traversal = 0;
-  if (Math.abs(selected.angle) > 0.3) {
-    const turn = selected.angle > 0 ? 'LEFT' : 'RIGHT';
-    showAlert(`${turn} TURN · ${selected.destination.name.toUpperCase()}`);
-  } else {
-    showAlert(`FOLLOW ROAD · ${selected.destination.name.toUpperCase()}`);
-  }
+  return closest;
 }
 
 function drawMap(position, heading) {
@@ -707,31 +693,20 @@ function drawMap(position, heading) {
   mapContext.restore();
 }
 
-function updateHud(position, tangent, steering, now) {
+function updateHud(position, tangent, now) {
   if (now - state.lastHudUpdate < 0.2) return;
   state.lastHudUpdate = now;
   const nearest = nodes
     .map(node => ({ node, distance: Math.hypot(position.x - node.x * WORLD_SCALE, position.z - node.z * WORLD_SCALE) }))
     .sort((a, b) => a.distance - b.distance)[0];
   locationReadout.textContent = nearest.distance < 700 ? nearest.node.name : 'North York Moors';
-  const onSchoolRoad = state.edge.a === 'stokesley' && state.direction === 1 && state.traversal < 1100;
-  roadNumber.textContent = onSchoolRoad ? 'STATION RD' : state.edge.name;
-  roadType.textContent = onSchoolRoad ? 'LOCAL ROAD' : state.edge.type;
+  const road = nearestRoad(position);
+  const onRoad = road.distance < 14;
+  roadNumber.textContent = onRoad ? road.name || 'LOCAL ROAD' : 'OFF ROAD';
+  roadType.textContent = onRoad ? road.type : 'FREE DRIVE';
   distanceReadout.textContent = `${state.trip.toFixed(1)} KM`;
-
-  const junction = nextJunction();
-  if (junction.distance < 520 && junction.options.length) {
-    const left = junction.options.find(option => turnAngle(tangent, option.tangent) > 0.25);
-    const right = junction.options.find(option => turnAngle(tangent, option.tangent) < -0.25);
-    const choices = [
-      left ? `A ${left.destination.name}` : '',
-      right ? `D ${right.destination.name}` : '',
-    ].filter(Boolean).join('  ·  ');
-    junctionReadout.textContent = `${junction.nodeId === 'great-ayton' && junction.distance < 80 ? 'AT ' : ''}${nodeById.get(junction.nodeId).name.toUpperCase()} · ${Math.round(junction.distance)} M${choices ? `  /  ${choices}` : ''}`;
-  } else {
-    const destination = nodeById.get(junction.nodeId);
-    junctionReadout.textContent = `NEXT · ${destination.name.toUpperCase()}  /  A-D AT JUNCTIONS`;
-  }
+  const destination = nearest.distance < 700 ? nearest.node.name.toUpperCase() : 'NORTH YORKSHIRE';
+  junctionReadout.textContent = `FREE DRIVE · ${Math.round(nearest.distance)} M FROM ${destination} · TURN ANYWHERE`;
   drawMap(position, Math.atan2(tangent.x, tangent.z));
 }
 
@@ -747,26 +722,19 @@ function update(delta) {
     else state.speed -= (brake ? 48 : 7) * delta;
     state.speed = THREE.MathUtils.clamp(state.speed, 0, MAX_SPEED);
     state.steer = THREE.MathUtils.damp(state.steer, steering, steering ? 7 : 4, delta);
-    state.offset = THREE.MathUtils.damp(state.offset, state.steer * 1.2, steering ? 4 : 2.5, delta);
-    const movement = state.speed * WORLD_SCALE / 3600 * delta;
-    state.traversal += movement;
-    state.trip += movement / WORLD_SCALE;
-    if (state.traversal >= state.edge.length) {
-      const incoming = currentPoint().tangent;
-      const nodeId = state.direction === 1 ? state.edge.b : state.edge.a;
-      state.traversal = state.edge.length;
-      chooseNextRoad(nodeId, incoming, steering);
-    }
+    state.heading -= state.steer * (0.25 + state.speed / MAX_SPEED * 0.95) * delta;
+    const movement = state.speed / 3.6 * delta;
+    const forward = currentPoint().tangent;
+    state.position.addScaledVector(forward, movement);
+    state.trip += movement / 1000;
   } else {
     state.speed = 0;
   }
 
   const { point, tangent } = currentPoint();
-  const side = new THREE.Vector3(tangent.z, 0, -tangent.x);
-  const carPosition = point.clone().addScaledVector(side, state.offset);
-  camera.position.set(carPosition.x, 1.5 + Math.min(state.speed / 180, 0.27), carPosition.z);
+  camera.position.set(point.x, 1.5 + Math.min(state.speed / 180, 0.27), point.z);
   camera.rotation.set(0, 0, 0);
-  camera.rotation.y = Math.atan2(tangent.x, tangent.z) + Math.PI - state.steer * 0.026;
+  camera.rotation.y = state.heading;
   camera.rotation.z = -state.steer * Math.min(state.speed / 600, 0.055);
   const bob = Math.sin(state.trip * 26) * Math.min(state.speed / 25000, 0.018);
   camera.position.y += bob;
@@ -778,12 +746,11 @@ function update(delta) {
   driveState.textContent = !state.started ? 'PARKED' : brake ? 'BRAKING' : accelerate ? 'DRIVING' : 'COASTING';
   revBar.style.width = `${Math.max(4, state.speed / MAX_SPEED * 100)}%`;
 
-  if (Math.abs(state.offset) > 3.7 && !roadAlert.classList.contains('visible')) showAlert('EASE BACK ONTO THE ROAD');
   if (state.speed > 68 && !brake && Math.floor(performance.now() / 12000) !== state.lastSpeedAlert) {
     state.lastSpeedAlert = Math.floor(performance.now() / 12000);
     showAlert('EASY NOW — ENJOY THE DRIVE');
   }
-  updateHud(carPosition, tangent, steering, performance.now() / 1000);
+  updateHud(point, tangent, performance.now() / 1000);
   renderer.render(scene, camera);
 }
 
