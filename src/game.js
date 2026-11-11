@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import stokesleyMap from './data/stokesley.json';
 import './style.css';
 
 const root = document.querySelector('#scene');
@@ -17,7 +18,7 @@ const junctionReadout = document.querySelector('#junction-info');
 const mapCanvas = document.querySelector('#map-canvas');
 const mapContext = mapCanvas.getContext('2d');
 
-const WORLD_SCALE = 230;
+const WORLD_SCALE = 1000;
 const MAX_SPEED = 82;
 const nodes = [
   { id: 'stokesley', name: 'Stokesley', x: 0, z: 0, kind: 'town' },
@@ -87,9 +88,9 @@ const roads = [
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#aebdb6');
-scene.fog = new THREE.Fog('#aebdb6', 230, 1500);
+scene.fog = new THREE.Fog('#aebdb6', 1700, 14000);
 
-const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 4500);
+const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 24000);
 camera.position.set(0, 1.5, -4);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -121,7 +122,7 @@ const materials = {
   wheel: new THREE.MeshStandardMaterial({ color: '#171d1a', roughness: 0.56 }),
 };
 
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), materials.grass);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000), materials.grass);
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.25;
 ground.receiveShadow = true;
@@ -129,6 +130,135 @@ scene.add(ground);
 
 function worldPoint(node) {
   return new THREE.Vector3(node.x * WORLD_SCALE, 0, node.z * WORLD_SCALE);
+}
+
+function addStokesleyMap() {
+  const campusShape = new THREE.Shape();
+  stokesleyMap.school.forEach(([x, z], index) => {
+    if (index === 0) campusShape.moveTo(x, -z);
+    else campusShape.lineTo(x, -z);
+  });
+  campusShape.closePath();
+  const campusGeometry = new THREE.ShapeGeometry(campusShape);
+  campusGeometry.rotateX(-Math.PI / 2);
+  campusGeometry.translate(0, -0.16, 0);
+  scene.add(new THREE.Mesh(
+    campusGeometry,
+    new THREE.MeshStandardMaterial({ color: '#758568', roughness: 1, side: THREE.DoubleSide }),
+  ));
+
+  const vergePositions = [];
+  const roadPositions = [];
+  const roadIndices = [];
+  const buildingWalls = [[], []];
+  const buildingWallIndices = [[], []];
+  const roofPositions = [];
+  const roofIndices = [];
+  const roadWidths = {
+    trunk: 10,
+    primary: 9,
+    secondary: 8,
+    tertiary: 7,
+    unclassified: 5.8,
+    residential: 5.6,
+    living_street: 5.2,
+    service: 4.5,
+  };
+  const isSchoolBuilding = (x, z) => {
+    let inside = false;
+    for (let index = 0, previous = stokesleyMap.school.length - 1; index < stokesleyMap.school.length; previous = index, index += 1) {
+      const [x1, z1] = stokesleyMap.school[index];
+      const [x2, z2] = stokesleyMap.school[previous];
+      if ((z1 > z) !== (z2 > z) && x < (x2 - x1) * (z - z1) / (z2 - z1) + x1) inside = !inside;
+    }
+    return inside;
+  };
+
+  for (const road of stokesleyMap.roads) {
+    const width = roadWidths[road.type] ?? 5.5;
+    for (let index = 1; index < road.points.length; index += 1) {
+      const [x1, z1] = road.points[index - 1];
+      const [x2, z2] = road.points[index];
+      const dx = x2 - x1;
+      const dz = z2 - z1;
+      const length = Math.hypot(dx, dz);
+      if (length < 0.1) continue;
+      const sideX = dz / length;
+      const sideZ = -dx / length;
+      const appendStrip = (positions, stripWidth) => {
+        positions.push(
+          x1 - sideX * stripWidth / 2, z1 - sideZ * stripWidth / 2,
+          x1 + sideX * stripWidth / 2, z1 + sideZ * stripWidth / 2,
+          x2 - sideX * stripWidth / 2, z2 - sideZ * stripWidth / 2,
+          x2 + sideX * stripWidth / 2, z2 + sideZ * stripWidth / 2,
+        );
+      };
+      appendStrip(vergePositions, width + 1.6);
+      const base = roadPositions.length / 2;
+      appendStrip(roadPositions, width);
+      roadIndices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+    }
+  }
+
+  function addSurface(positions, indices, y, material) {
+    if (!positions.length) return;
+    const vertices = [];
+    for (let index = 0; index < positions.length; index += 2) {
+      vertices.push(positions[index], y, positions[index + 1]);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    if (indices) geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    scene.add(new THREE.Mesh(geometry, material));
+  }
+
+  const stripIndices = Array.from({ length: roadPositions.length / 2 / 4 }, (_, index) => {
+    const base = index * 4;
+    return [base, base + 2, base + 1, base + 1, base + 2, base + 3];
+  }).flat();
+  addSurface(vergePositions, stripIndices, -0.07, materials.verge);
+  addSurface(roadPositions, roadIndices, -0.025, materials.tarmac);
+
+  for (const building of stokesleyMap.buildings) {
+    if (building.points.length < 3) continue;
+    const contour = building.points.map(([x, z]) => new THREE.Vector2(x, -z));
+    const center = building.points.reduce((result, [x, z]) => [result[0] + x, result[1] + z], [0, 0])
+      .map(value => value / building.points.length);
+    const belongsToSchool = isSchoolBuilding(center[0], center[1]);
+    const wallGroup = belongsToSchool ? 1 : 0;
+    const levelCount = Number.parseInt(building.levels, 10);
+    const height = THREE.MathUtils.clamp(Number.isFinite(levelCount) ? levelCount * 3 : wallGroup ? 6.5 : 4.6, 3.4, 13);
+    const walls = buildingWalls[wallGroup];
+    const wallIndices = buildingWallIndices[wallGroup];
+    for (let index = 0; index < building.points.length; index += 1) {
+      const [x1, z1] = building.points[index];
+      const [x2, z2] = building.points[(index + 1) % building.points.length];
+      const base = walls.length / 3;
+      walls.push(x1, 0, z1, x1, height, z1, x2, height, z2, x2, 0, z2);
+      wallIndices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+
+    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, [])) {
+      for (const index of [a, b, c]) {
+        roofPositions.push(building.points[index][0], height, building.points[index][1]);
+      }
+      const triangle = roofIndices.length;
+      roofIndices.push(triangle, triangle + 1, triangle + 2);
+    }
+  }
+
+  const addBuildingMesh = (positions, indices, material) => {
+    if (!positions.length) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    scene.add(new THREE.Mesh(geometry, material));
+  };
+  addBuildingMesh(buildingWalls[0], buildingWallIndices[0], materials.stone);
+  addBuildingMesh(buildingWalls[1], buildingWallIndices[1], materials.brick);
+  addBuildingMesh(roofPositions, roofIndices, materials.roof);
 }
 
 function makeSignTexture(lines, foreground, background) {
@@ -264,10 +394,11 @@ const edges = roads.map((road, index) => {
     const t = (dash + 0.5) / dashCount;
     const point = curve.getPointAt(t);
     const tangent = curve.getTangentAt(t);
+    const visible = Math.hypot(point.x, point.z) > 1100;
     matrix.compose(
       new THREE.Vector3(point.x, -0.01, point.z),
       new THREE.Quaternion().setFromUnitVectors(direction, tangent),
-      new THREE.Vector3(1, 1, 1),
+      new THREE.Vector3(visible ? 1 : 0, visible ? 1 : 0, visible ? 1 : 0),
     );
     dashes.setMatrixAt(dash, matrix);
   }
@@ -280,6 +411,8 @@ for (const edge of edges) {
   connections.get(edge.a).push(edge);
   connections.get(edge.b).push(edge);
 }
+
+addStokesleyMap();
 
 function addRoseberryTopping() {
   const base = worldPoint(nodeById.get('roseberry'));
@@ -312,7 +445,7 @@ function addDistantHills() {
 
 function addTownScenery(node, index) {
   const center = worldPoint(node);
-  const size = node.kind === 'town' || node.kind === 'coast' ? 8 : node.kind === 'village' ? 5 : 2;
+  const size = node.id === 'stokesley' ? 0 : node.kind === 'town' || node.kind === 'coast' ? 8 : node.kind === 'village' ? 5 : 2;
   for (let building = 0; building < size; building += 1) {
     const angle = building * 2.399 + index * 0.6;
     const radius = 23 + (building * 19 % 62);
@@ -350,6 +483,7 @@ for (const edge of edges) {
     const side = new THREE.Vector3(tangent.z, 0, -tangent.x);
     for (const sign of [-1, 1]) {
       const distance = 21 + ((step * 29 + seed) % 39);
+      if (Math.hypot(point.x, point.z) < 850) continue;
       const x = point.x + side.x * distance * sign;
       const z = point.z + side.z * distance * sign;
       if (edge.type.includes('MOOR') && step % 3 !== 0) {
@@ -580,8 +714,9 @@ function updateHud(position, tangent, steering, now) {
     .map(node => ({ node, distance: Math.hypot(position.x - node.x * WORLD_SCALE, position.z - node.z * WORLD_SCALE) }))
     .sort((a, b) => a.distance - b.distance)[0];
   locationReadout.textContent = nearest.distance < 700 ? nearest.node.name : 'North York Moors';
-  roadNumber.textContent = state.edge.name;
-  roadType.textContent = state.edge.type;
+  const onSchoolRoad = state.edge.a === 'stokesley' && state.direction === 1 && state.traversal < 1100;
+  roadNumber.textContent = onSchoolRoad ? 'STATION RD' : state.edge.name;
+  roadType.textContent = onSchoolRoad ? 'LOCAL ROAD' : state.edge.type;
   distanceReadout.textContent = `${state.trip.toFixed(1)} KM`;
 
   const junction = nextJunction();

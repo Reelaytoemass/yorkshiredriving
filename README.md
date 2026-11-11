@@ -5,6 +5,9 @@ connected roads through the North York Moors, the Yorkshire Dales, market towns,
 and the coast. Choose left or right at junctions to explore; the small map tracks
 your position as you drive.
 
+The starting streets, school grounds, and nearby building outlines are based on
+OpenStreetMap data. The wider regional scenery remains stylized.
+
 ## Controls
 
 - **W / Up arrow:** accelerate
@@ -25,7 +28,7 @@ For a production build, run `npm run build`. To publish the game, push to the
 `main` branch; the GitHub Actions workflow deploys it to GitHub Pages at
 `https://reelaytoemass.github.io/yorkshiredriving/`.
 
-The scenery and road network are generated in the browser with Three.js. The
-roads connect Stokesley, Great Ayton, Guisborough, Helmsley, Whitby, Pickering,
-Scarborough, Malton, York, Thirsk, Northallerton, Richmond, Hawes, Settle, and
-other local places.
+The Three.js scene connects Stokesley, Great Ayton, Guisborough, Helmsley,
+Whitby, Pickering, Scarborough, Malton, York, Thirsk, Northallerton, Richmond,
+Hawes, Settle, and other local places. Stokesley map data is © OpenStreetMap
+contributors and available under the [Open Database License](https://www.openstreetmap.org/copyright).
